@@ -42,28 +42,54 @@ A completely flat structure can be efficiently processed by tools like Presto, H
 
 Advanced techniques for handling schema evolution should be only used when advanced techniques are justified.
 
-### Use “required” fields sparingly
-In fact, consider not using required fields at all. Once you called something required, you can never, ever, not have it (unless you use the union pattern described later in this document). 
-Newly added fields can only be optional: otherwise, a new reader will break when encountering old data.
+### Default values
+
+Do not rely on special default values set via the IDL if you do not have (or expect not to have in the future) extremely tight control over all potential readers and writers. Unfortunately handling of missing values and application of defaults is not consistent across languages for some of these frameworks, and such issues are very tough to debug.
+
+You don't want to find yourself reasoning through the difference between a value that happens to be equal to the default value and was serialized, and a default value that was generated for you by the reader because the field was not present in the serialized object. 
 
 ## Part 3: Schema Evolution
 
-### Adding Fields
+Schema evolution refers to changes one introduces to the schema over time. Changes one might want to introduce include:
+
+* adding a field
+* removing a field
+* renaming a field
+* changing a field's type
+* making an optional field required
+* making a required field optional
+* adding or changing a field's default value
+
+When you are dealing with the inertia of historical data, evolving schemas is hard because backwards compatibility has to be maintained, or data becomes unreadable.
+
+It is also very useful to have your schema be as tight as possible, enforcing assumptions about data at write time and providing data producers with immediate feedback, and making it possible to easily prevent data problems via automated testing.
+
+One approach commonly recommended when dealing with such IDLs amounts to the "optionals-only" pattern, laid out below. Major refactoring can be performed using another, more advanced, "union pattern". The Union pattern has to be committed to when you first design the schema, so don't skip reading that section of this document.
+
+### Optionals-only pattern for minor schema changes
+
+This approach ensures that old data remains valid, and new data can be (lossily) read by old readers. This approach does introduce another problem -- over time, baggage in the form of deprecated fields accumulates; one has to know not to trust some fields, and use others instead; a consumer who looks at the schema has a hard time understanding how things are supposed to fit together, and what can and cannot be relied on to be present. Comments only go so far to explain what's going on.
+
+#### Optional vs required fields
+Never use required fields because you might decide in the future they are not required. Adding new required fields renders old data invalid. A required field that's backwards-compatible via a default value is just an optional field. 
+
+#### Adding Fields
 Only ever add fields. Never delete fields. If you need to delete a field, just stop using it, and rename it to something like deprecated_foo_ms.
 
 Thrift (possibly only older versions of thrift java libraries) ran into problems when an old reader ran into a new enum value -- pre-seed with “reserved_enum_value_1” and so on, always keep a bunch at the end.
 
-### Renaming Fields
+#### Renaming Fields
 Renaming a field is dangerous. There is likely to be code out there getting fields by name, not by id (especially if you serialize as JSON). Avoid the temptation.
 The only exception is the above advice to rename deprecated fields. This is fine since no one should actually be using the field at this point to write new data; old readers not knowing about this new name won’t be a problem, since there is nothing for them to fail to read because of this.
-Never, ever, change types
+
+#### Never, ever, change types
 If you need to change a field’s type, add a new field and deprecate the old one. Also, consider just not skimping on bits. The majority of type migrations we’ve seen have been ints to doubles.
 Once it’s in master, it’s in use
 If you are part of a large technical organization that uses such IDLs for data serialization widely, it is rare to be able to guarantee that something on the master branch has not actually been used. It’s safest to assume that once a patch hits master, it’s production and all of the above schema evolution rules apply.
 
-## Part 4: Advanced modeling patterns
-
 ### Union pattern for major refactoring
+
+The Union pattern that allows significant refactoring to be introduced without sacrificing the ability to read old data.
 
 Only being able to add fields can eventually result in pretty ugly schemas, with a ton of deprecated fields one must know to ignore. The Union pattern was identified as a way to allow major schema refactoring to take place, while allowing code that knows about the new schema to still do a reasonable job with old data.
 
@@ -96,9 +122,13 @@ With a little bit of cleverness, one can build an automated cascade of converter
 
 This pattern does assume you have reasonable control over consuming libraries. It allows for safe major refactoring of schemas, allowing one to perform major migrations such as moving from parsed strings for dates into numerical timestamps, or other, more complex calculations. It also frees one from having to migrate the old data, assuming that read-time conversion is an acceptable cost.
 
-If you adopt this pattern, it is still advisable to be conservative when introducing new schema versions -- only use it when the changes are really not backwards compatible.
+Note also that this approach requires that all consumers be upgraded to a new schema before producers are. If an old reader encounters a new schema, it will fail to parse the new data. This is arguably preferable to interpreting the data by using old definitions.
 
-Also note that this method does introduce more complexity than a simple struct carries, and data represented this way may be hard for general-purpose tools to consume (since they may not have the capability of accommodating the converter code, and may not have robust ways of dealing with unions in the first place).
+If you adopt this pattern, it is still advisable to be conservative when introducing new schema versions -- only use it when the changes are really not backwards compatible. The "add optional fields" approach can be used for small incremental changes.
+
+Note that this method does introduce more complexity than a simple struct carries. Use good judgement.
+
+## Other Topics
 
 ### Advanced Types
 Timestamp types and the like. Automated validation,
