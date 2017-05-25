@@ -136,3 +136,13 @@ Scala has fancy things you can hang onto specialized types, so decorating an int
 
 ### Maps, features, and debug info
 Yes but many caveats about when this is appropriate and how to stay out of the abyss [to be filled in]
+
+## Further Reading
+
+[Confluent Blog: How I learned to Stop Worrying and Love the Schema](https://www.confluent.io/blog/how-i-learned-to-stop-worrying-and-love-the-schema-part-1/) by Geoff Anderson
+
+[Confluent Blog: Yes, Virginia, You Really Do Need a Schema Registry](https://www.confluent.io/blog/schema-registry-kafka-stream-processing-yes-virginia-you-really-need-one/) by Gwen Shapira
+
+[O'Reilly Radar: The problem of managing schemas](https://www.oreilly.com/ideas/the-problem-of-managing-schemas) by Gwen Shapira
+
+[Apache Avro documentation: Schema resolution rules](https://avro.apache.org/docs/1.8.1/spec.html#Schema+Resolution) Avro's built-in schema resolution rules (which may not always be sufficient for major refactoring, which is why you need all of the above)
